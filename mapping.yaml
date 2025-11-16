@@ -1,0 +1,7 @@
+# Koura Wealth fund code to symbol mapping
+# You can override or add custom mappings here
+# The default mappings are already included in SyncKoura.py
+
+symbol_mapping:
+  # Example custom mappings (optional)
+  # "810003": "CUSTOM-SYMBOL.NZ"
