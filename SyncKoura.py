@@ -313,47 +313,48 @@ class SyncKoura:
     def reconstruct_fund_purchases(self, transactions: List[dict], account_details: dict,
                                    portfolio_funds: List[dict]) -> List[dict]:
         """
-        Track contributions as simple cash deposits to the Koura account.
-        Don't try to reconstruct individual fund purchases since Ghostfolio
-        can't track current prices for MANUAL assets, leading to incorrect valuations.
+        Create BUY activities for current fund holdings to show allocation breakdown.
+        Uses fixed $1.00 unit price so values don't fluctuate with market prices.
         """
         activities = []
 
-        # Process contribution transactions
-        for txn in transactions:
-            description = txn.get("description", "")
-            amount = txn.get("amount", 0)
-            date = txn.get("date", "")
+        # Create one BUY activity per fund showing current holdings
+        # Use today's date so they appear as current positions
+        today = datetime.now().isoformat()
 
-            # Only process positive contributions (ignore fees, taxes, etc for now)
-            if amount <= 0:
+        for fund in portfolio_funds:
+            fund_code = str(fund.get('fundId') or fund.get('code', ''))
+            fund_name = fund.get('name', 'Unknown')
+            units = fund.get('units', 0)
+            value = fund.get('value', 0)
+
+            if value <= 0 or units <= 0:
+                logger.info("Skipping fund %s with zero value/units", fund_name)
                 continue
 
-            # Filter for contribution types
-            if not any(keyword in description for keyword in ["Contribution", "contribution"]):
+            # Get Ghostfolio symbol
+            symbol = self.fund_mapping.get(fund_code)
+            if not symbol:
+                logger.warning("No symbol mapping for fund code %s", fund_code)
                 continue
 
-            logger.info("Processing contribution: %s on %s for amount %s", description, date, amount)
-
-            # Create a single contribution activity (not split by fund)
-            iso_date = datetime.strptime(date, "%Y-%m-%d").isoformat()
-
-            # Track as INTEREST type (closest to a cash deposit in Ghostfolio)
+            # Create BUY activity with fixed $1.00 unit price
+            # Quantity = dollar value, so total value stays constant
             activity = {
                 "accountId": None,  # Will be set later
-                "comment": f"transactionId={date}|{description}",
-                "currency": self.ghost_currency,  # Use account currency (NZD)
+                "comment": f"Current holdings: {units:.4f} units @ ${value/units:.4f} per unit",
+                "currency": self.ghost_currency,
                 "dataSource": "MANUAL",
-                "date": iso_date,
+                "date": today,
                 "fee": 0,
-                "quantity": 1,  # Dummy quantity
-                "symbol": "GF_KOURACASH",  # Use a single cash symbol
-                "type": "INTEREST",  # Treat contribution as interest/income
-                "unitPrice": round(amount, 4)  # Store contribution amount as unit price
+                "quantity": round(value, 2),  # Use dollar value as quantity
+                "symbol": symbol,
+                "type": "BUY",
+                "unitPrice": 1.0  # Fixed price so value = quantity
             }
 
             activities.append(activity)
-            logger.info("Created contribution activity: %s NZD on %s", amount, date)
+            logger.info("Created holding for %s: $%.2f NZD", fund_name, value)
 
         return activities
 
