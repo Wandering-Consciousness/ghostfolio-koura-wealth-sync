@@ -313,16 +313,11 @@ class SyncKoura:
     def reconstruct_fund_purchases(self, transactions: List[dict], account_details: dict,
                                    portfolio_funds: List[dict]) -> List[dict]:
         """
-        Reconstruct fund purchases from contribution transactions.
-        Uses the chosen allocation to split contributions across funds.
+        Track contributions as simple cash deposits to the Koura account.
+        Don't try to reconstruct individual fund purchases since Ghostfolio
+        can't track current prices for MANUAL assets, leading to incorrect valuations.
         """
         activities = []
-
-        # Get allocation percentages
-        chosen_allocation = account_details.get("chosen", {})
-
-        # Create fund lookup by code
-        funds_by_code = {fund["code"]: fund for fund in portfolio_funds}
 
         # Process contribution transactions
         for txn in transactions:
@@ -340,56 +335,25 @@ class SyncKoura:
 
             logger.info("Processing contribution: %s on %s for amount %s", description, date, amount)
 
-            # Split contribution across funds based on allocation
-            for allocation_field, fund_code in self.ALLOCATION_MAPPING.items():
-                allocation_pct = chosen_allocation.get(allocation_field, 0)
+            # Create a single contribution activity (not split by fund)
+            iso_date = datetime.strptime(date, "%Y-%m-%d").isoformat()
 
-                if allocation_pct == 0:
-                    continue
+            # Track as INTEREST type (closest to a cash deposit in Ghostfolio)
+            activity = {
+                "accountId": None,  # Will be set later
+                "comment": f"transactionId={date}|{description}",
+                "currency": self.ghost_currency,  # Use account currency (NZD)
+                "dataSource": "MANUAL",
+                "date": iso_date,
+                "fee": 0,
+                "quantity": 1,  # Dummy quantity
+                "symbol": "GF_KOURACASH",  # Use a single cash symbol
+                "type": "INTEREST",  # Treat contribution as interest/income
+                "unitPrice": round(amount, 4)  # Store contribution amount as unit price
+            }
 
-                fund_data = funds_by_code.get(fund_code)
-                if not fund_data:
-                    logger.warning("Fund %s not found in portfolio", fund_code)
-                    continue
-
-                # Calculate investment amount for this fund
-                investment_amount = amount * (allocation_pct / 100.0)
-
-                # Get unit price on transaction date
-                unit_price = self.get_unit_price_for_date(fund_data, date)
-
-                if unit_price is None or unit_price == 0:
-                    logger.warning("No unit price found for fund %s on %s", fund_code, date)
-                    continue
-
-                # Calculate units purchased
-                units = investment_amount / unit_price
-
-                # Get fund symbol for Ghostfolio
-                symbol = self.fund_mapping.get(fund_code, fund_code)
-
-                # Create activity
-                iso_date = datetime.strptime(date, "%Y-%m-%d").isoformat()
-
-                # Note: Using USD for currency as Ghostfolio manual assets require USD
-                # The account can still be in NZD
-                activity = {
-                    "accountId": None,  # Will be set later
-                    "comment": f"transactionId={date}|{description}|{allocation_field}",
-                    "currency": "USD",  # Manual assets in Ghostfolio require USD
-                    "dataSource": "MANUAL",
-                    "date": iso_date,
-                    "fee": 0,
-                    "quantity": round(units, 6),
-                    "symbol": symbol,
-                    "type": "BUY",
-                    "unitPrice": round(unit_price, 4)
-                }
-
-                activities.append(activity)
-                logger.info("Created activity: %s units of %s at %s = %s NZD",
-                           activity["quantity"], symbol, activity["unitPrice"],
-                           investment_amount)
+            activities.append(activity)
+            logger.info("Created contribution activity: %s NZD on %s", amount, date)
 
         return activities
 

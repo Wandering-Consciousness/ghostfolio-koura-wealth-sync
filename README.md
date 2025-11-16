@@ -5,23 +5,22 @@ Sync your Ghostfolio portfolio with Koura Wealth KiwiSaver accounts.
 ## Features
 
 - Automatically syncs Koura Wealth KiwiSaver contributions to Ghostfolio
-- Reconstructs fund purchases based on your chosen allocation
-- Tracks historical performance by using actual unit prices from transaction dates
+- Tracks contribution history (employee, employer, voluntary)
+- Maintains accurate account balance matching Koura app
 - Supports multiple accounts
 - Can be run manually or on a cron schedule
 - Docker support for easy deployment
 
 ## How It Works
 
-Since Koura Wealth is a managed fund platform (not a stock broker), it doesn't provide individual buy/sell trade records. This sync tool:
+Since Koura Wealth is a managed fund platform (not a stock broker), this sync tool:
 
-1. Fetches all contribution transactions (employee, employer, voluntary)
-2. Gets your chosen fund allocation percentages
-3. Retrieves historical unit prices for each fund
-4. Reconstructs individual fund purchases by:
-   - Splitting each contribution across funds based on your allocation
-   - Calculating units purchased using the unit price on the transaction date
-5. Creates activities in Ghostfolio for tracking performance
+1. Fetches all contribution transactions from Koura Wealth API
+2. Creates INTEREST activities in Ghostfolio to track contribution history
+3. Sets the account cash balance to match your current Koura balance
+4. Maintains accurate total value without trying to track individual fund prices
+
+**Note:** This tool tracks contributions as cash flow rather than individual fund purchases. This approach ensures the Ghostfolio account balance always matches your actual Koura Wealth balance, since Ghostfolio cannot automatically track market prices for managed KiwiSaver funds.
 
 ## Setup
 
@@ -44,8 +43,12 @@ Since Koura Wealth is a managed fund platform (not a stock broker), it doesn't p
 
 ### Ghostfolio
 
-1. Get your Ghostfolio user **KEY** (used to login)
-2. Generate an authentication token:
+**Option 1: Using User Key (Cloud/Self-Hosted)**
+1. Get your Ghostfolio user **KEY** from account settings
+2. Set `GHOST_KEY` in your `.env` file
+
+**Option 2: Using Auth Token (Self-Hosted)**
+1. Generate an authentication token:
 
 ```bash
 curl -X POST -H "Content-Type: application/json" \
@@ -53,7 +56,30 @@ curl -X POST -H "Content-Type: application/json" \
   https://ghostfol.io/api/v1/auth/anonymous
 ```
 
-3. Save the `authToken` from the response
+2. Save the `authToken` from the response
+3. Set `GHOST_TOKEN` in your `.env` file
+
+**Option 3: Creating Manual Assets (Required)**
+
+Before running the sync, you need to create 9 manual asset profiles in Ghostfolio for the Koura funds:
+
+1. In Ghostfolio, go to Admin → Asset Profiles
+2. Click "Add Manually" for each fund
+3. Create the following assets:
+
+| Symbol | Name | Currency | Asset Class |
+|--------|------|----------|-------------|
+| GF_KOURAFI | Koura Fixed Interest Fund | NZD | Fixed Income |
+| GF_KOURANZEQ | Koura NZ Equities Fund | NZD | Equity |
+| GF_KOURAUSEQ | Koura US Equities Fund | NZD | Equity |
+| GF_KOURAROWEQ | Koura Rest of World Equities Fund | NZD | Equity |
+| GF_KOURAEMEQ | Koura Emerging Markets Equities Fund | NZD | Equity |
+| GF_KOURABTC | Koura Bitcoin Fund | NZD | Alternative Investment |
+| GF_KOURACLEAN | Koura Clean Energy Fund | NZD | Equity |
+| GF_KOURAPROP | Koura Property Fund | NZD | Real Estate |
+| GF_KOURASTRAT | Koura Strategic Growth Fund | NZD | Equity |
+
+Set **Data Source** to **MANUAL** for all assets.
 
 ### Configuration
 
@@ -149,22 +175,20 @@ The `OPERATION` environment variable controls what the sync tool does:
 
 ## Fund Symbols
 
-The sync tool creates the following symbols in Ghostfolio for Koura funds:
+The sync tool uses the following Ghostfolio symbols for Koura funds (must be created manually as described in setup):
 
-| Fund | Symbol |
-|------|--------|
-| Cash Fund | KOURA-CASH.NZ |
-| Fixed Interest Fund | KOURA-FI.NZ |
-| NZ Equities Fund | KOURA-NZEQ.NZ |
-| US Equities Fund | KOURA-USEQ.NZ |
-| Rest of World Equities Fund | KOURA-ROWEQ.NZ |
-| Emerging Markets Equities Fund | KOURA-EMEQ.NZ |
-| Bitcoin Fund | KOURA-BTC.NZ |
-| Clean Energy Fund | KOURA-CLEAN.NZ |
-| Property Fund | KOURA-PROP.NZ |
-| Strategic Growth Fund | KOURA-STRAT.NZ |
-
-You can customize these in `mapping.yaml`.
+| Fund | Symbol | Asset Class |
+|------|--------|-------------|
+| Cash Fund | GF_KOURACASH | Liquidity |
+| Fixed Interest Fund | GF_KOURAFI | Fixed Income |
+| NZ Equities Fund | GF_KOURANZEQ | Equity |
+| US Equities Fund | GF_KOURAUSEQ | Equity |
+| Rest of World Equities Fund | GF_KOURAROWEQ | Equity |
+| Emerging Markets Equities Fund | GF_KOURAEMEQ | Equity |
+| Bitcoin Fund | GF_KOURABTC | Alternative Investment |
+| Clean Energy Fund | GF_KOURACLEAN | Equity |
+| Property Fund | GF_KOURAPROP | Real Estate |
+| Strategic Growth Fund | GF_KOURASTRAT | Equity |
 
 ## Symbol Mapping
 
