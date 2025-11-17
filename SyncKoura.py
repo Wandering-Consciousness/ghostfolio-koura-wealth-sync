@@ -409,14 +409,9 @@ class SyncKoura:
             logger.info("Found %d new activities to sync", len(diff))
             self.import_act(diff)
 
-        # Update cash balance
-        accounts = self.get_koura_accounts()
-        for acc in accounts:
-            if acc["id"] == int(self.koura_account_id):
-                cash_balance = acc.get("cashBalance", 0)
-                logger.info("Updating cash balance to %s", cash_balance)
-                self.set_cash_to_account(account_id, {self.ghost_currency: cash_balance})
-                break
+        # Set cash balance to 0 since all holdings are tracked as BUY activities
+        logger.info("Setting cash balance to 0 (all holdings tracked as fund activities)")
+        self.set_cash_to_account(account_id, {self.ghost_currency: 0})
 
     # Ghostfolio API methods (same as SyncIBKR)
 
