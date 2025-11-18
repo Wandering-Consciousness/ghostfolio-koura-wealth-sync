@@ -318,9 +318,9 @@ class SyncKoura:
         """
         activities = []
 
-        # Create one BUY activity per fund showing current holdings
-        # Use today's date so they appear as current positions
-        today = datetime.now().isoformat()
+        # Use Feb 8, 2024 - start date at NZ job
+        # Fixed date so deduplication works on subsequent syncs
+        holdings_date = "2024-02-08T00:00:00"
 
         for fund in portfolio_funds:
             fund_code = str(fund.get('fundId') or fund.get('code', ''))
@@ -342,10 +342,10 @@ class SyncKoura:
             # Quantity = dollar value, so total value stays constant
             activity = {
                 "accountId": None,  # Will be set later
-                "comment": f"Current holdings: {units:.4f} units @ ${value/units:.4f} per unit",
+                "comment": f"transactionId=HOLDING-{fund_code}|Current holdings: {units:.4f} units @ ${value/units:.4f} per unit",
                 "currency": self.ghost_currency,
                 "dataSource": "MANUAL",
-                "date": today,
+                "date": holdings_date,
                 "fee": 0,
                 "quantity": round(value, 2),  # Use dollar value as quantity
                 "symbol": symbol,
