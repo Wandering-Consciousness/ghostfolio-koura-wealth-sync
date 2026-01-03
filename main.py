@@ -1,7 +1,11 @@
 import logging
 import os
 
+from dotenv import load_dotenv
 from SyncKoura import SyncKoura
+
+# Load environment variables from .env file
+load_dotenv()
 from pretty_print import pretty_print_table
 
 template = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
